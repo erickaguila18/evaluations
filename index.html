@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Plataforma EEMS - Evaluaciones y Cursos</title>
+    
+    <!-- Icons by Flaticon -->
+    <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/4.0.0/uicons-solid-straight/css/uicons-solid-straight.css'>
+    <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/4.0.0/uicons-brands/css/uicons-brands.css'>
+    
+    <!-- CSS Externo -->
+    <link rel="stylesheet" href="./css/styles.css">
+
+    <!-- SCRIPT ANTI-FLASH DE COLORES Y FAVICON (Se ejecuta antes de dibujar el DOM) -->
+    <script>
+        (function() {
+            function sanitize(str) { return typeof str === 'string' ? str.replace(/[^\w\s#:/.-]/gi, '') : ''; }
+            function shadeColorInline(color, percent) {
+                let R = parseInt(color.substring(1,3),16); let G = parseInt(color.substring(3,5),16); let B = parseInt(color.substring(5,7),16);
+                R = parseInt(R * (80) / 100); G = parseInt(G * (80) / 100); B = parseInt(B * (80) / 100);
+                R = (R<255)?R:255; G = (G<255)?G:255; B = (B<255)?B:255;
+                let RR = ((R.toString(16).length==1)?"0"+R.toString(16):R.toString(16));
+                let GG = ((G.toString(16).length==1)?"0"+G.toString(16):G.toString(16));
+                let BB = ((B.toString(16).length==1)?"0"+B.toString(16):B.toString(16));
+                return "#"+RR+GG+BB;
+            }
+            try {
+                const brandingStr = localStorage.getItem('eems_branding');
+                if (brandingStr) {
+                    const branding = JSON.parse(brandingStr);
+                    let customStyles = ':root {';
+                    if (branding.color && branding.color.length >= 7) {
+                        const safeColor = sanitize(branding.color);
+                        const darkColor = shadeColorInline(safeColor, -20);
+                        customStyles += ' --primary: ' + safeColor + ' !important; --primary-dark: ' + darkColor + ' !important;';
+                    }
+                    if (branding.footerColor && branding.footerColor.length >= 7) {
+                        customStyles += ' --footer-bg: ' + sanitize(branding.footerColor) + ' !important;';
+                    }
+                    customStyles += ' }';
+                    document.write('<style id="dynamic-branding">' + customStyles + '</style>');
+                    
+                    if (branding.logoUrl) {
+                        if(branding.logoUrl.startsWith('data:image') || branding.logoUrl.startsWith('http')) {
+                            document.write('<link id="dynamic-favicon" rel="icon" href="' + branding.logoUrl + '">');
+                        }
+                    }
+                }
+            } catch(e) {}
+        })();
+    </script>
+</head>
+<body>
+
+<div id="full-screen-loader">
+    <i class="fi fi-ss-spinner" style="font-size: 64px; color: #BDC3C7; display: inline-block; animation: spin 2s linear infinite;"></i>
+    <h2 style="color: #2C3E50; margin-top: 20px;">Preparando Entorno...</h2>
+</div>
+
+<nav class="navbar hidden" id="main-navbar">
+    <div class="navbar-brand" onclick="window.logoClick()">
+        <img id="nav-brand-img" src="" class="hidden" alt="Logo">
+        <i id="nav-brand-icon" class="fi fi-ss-briefcase-medical" style="font-size: 1.8rem;"></i>
+        <span id="nav-brand-text" class="brand-title">Plataforma EEMS</span>
+    </div>
+    <div class="nav-links" id="nav-actions">
+        <button id="nav-volver" class="hidden" onclick="window.backToDashboard()"><i class="fi fi-ss-arrow-left"></i> Volver</button>
+        <button id="nav-settings" class="icon-btn hidden" onclick="window.showSettingsPanel()" title="Ajustes de Plataforma">
+            <i class="fi fi-ss-settings"></i>
+        </button>
+        <button onclick="window.showInstructorLogin()" id="nav-ingresar" class="hidden"><i class="fi fi-ss-sign-in-alt"></i> Ingresar</button>
+    </div>
+</nav>
+
+<div id="custom-dialog" class="modal-overlay hidden">
+    <div id="dialog-box" class="modal-content primary-top">
+        <h2 id="dialog-title" style="color: var(--text-main); justify-content: center;">Atención</h2>
+        <p id="dialog-message" style="font-size: 1.1rem; text-align: center; margin-top: 15px;"></p>
+        <div class="dialog-actions">
+            <button id="dialog-cancel-btn" class="btn-secondary hidden"><i class="fi fi-ss-cross"></i> Cancelar</button>
+            <button id="dialog-ok-btn"><i class="fi fi-ss-check"></i> Aceptar</button>
+        </div>
+    </div>
+</div>
+
+<div id="details-modal" class="modal-overlay hidden">
+    <div class="modal-content primary-top" style="max-width: 650px; max-height: 85vh; overflow-y: auto; align-items: flex-start; text-align: left; padding: 25px;">
+        <div style="width: 100%; text-align: center; margin-bottom: 5px;"><i class="fi fi-ss-document-signed" style="font-size: 45px; color: var(--primary);"></i></div>
+        <h2 style="color: var(--primary); text-align: center; margin-top: 0; width: 100%;">Reporte de Evaluación</h2>
+        <p id="details-student-name" style="font-weight: bold; font-size: 1.2rem; text-align: center; margin-bottom: 5px; width: 100%;"></p>
+        <p id="details-score" style="margin-top: 0; color: var(--text-secondary); text-align: center; width: 100%;"></p>
+        <div id="details-questions" style="width: 100%; margin-top: 15px;"></div>
+        <div class="dialog-actions" style="justify-content: center; width: 100%;">
+            <button class="btn-secondary" onclick="document.getElementById('details-modal').classList.add('hidden')" style="width: auto;"><i class="fi fi-ss-cross"></i> Cerrar Reporte</button>
+        </div>
+    </div>
+</div>
+
+<div id="student-feedback-modal" class="modal-overlay hidden">
+    <div class="modal-content primary-top" style="max-width: 650px; max-height: 85vh; overflow-y: auto; align-items: flex-start; text-align: left; padding: 25px;">
+        <div style="width: 100%; text-align: center; margin-bottom: 5px;"><i class="fi fi-ss-graduation-cap" style="font-size: 45px; color: var(--primary);"></i></div>
+        <h2 style="color: var(--primary); text-align: center; margin-top: 0; width: 100%;">Tus Resultados</h2>
+        <div style="text-align: center; width: 100%; font-size: 2rem; font-weight: bold; color: var(--primary-dark);" id="student-feedback-score"></div>
+        <p id="student-feedback-status" style="text-align: center; width: 100%; margin-top: 5px;"></p>
+        <p style="font-size: 0.9rem; color: var(--text-secondary); text-align: center; width: 100%; border-bottom: 1px solid #E0E0E0; padding-bottom: 15px;">A continuación se muestran los temas en los que tuviste áreas de oportunidad. Te recomendamos repasarlos.</p>
+        <div id="student-feedback-questions" style="width: 100%; margin-top: 15px;"></div>
+        <div class="dialog-actions" style="justify-content: center; width: 100%;">
+            <button class="btn-secondary" onclick="document.getElementById('student-feedback-modal').classList.add('hidden')" style="width: auto;"><i class="fi fi-ss-cross"></i> Cerrar</button>
+        </div>
+    </div>
+</div>
+
+<div id="certificate-modal" class="modal-overlay hidden">
+    <div class="modal-content" style="max-width: 800px; width: 100%; padding: 0; background: #F0F4F8; max-height: 95vh; display: flex; flex-direction: column;">
+        <div style="overflow-y: auto; width: 100%; padding: 20px; box-sizing: border-box; flex-grow: 1; display: flex; justify-content: center; align-items: center;">
+            <div id="printable-certificate" class="certificate-box">
+                <img id="cert-logo" src="" class="cert-corner-logo hidden" alt="Logo Institucional">
+                <i class="fi fi-ss-diploma" style="font-size: clamp(40px, 8vw, 50px); color: var(--primary-dark); margin-bottom: 5px;"></i>
+                <h1 style="color: var(--primary-dark); font-size: clamp(1.4rem, 4vw, 1.8rem); text-transform: uppercase; margin-top: 0; text-align: center;">Certificado de Finalización</h1>
+                <p style="font-size: clamp(0.9rem, 2.5vw, 1rem); color: var(--text-secondary); text-align: center; margin: 5px 0;">Se otorga el presente reconocimiento a:</p>
+                <h2 id="cert-student-name" style="font-size: clamp(1.5rem, 5vw, 2rem); color: var(--text-main); border-bottom: 2px solid var(--primary); display: inline-block; padding-bottom: 5px; margin-bottom: 15px; text-align: center;">Nombre del Alumno</h2>
+                <p style="font-size: clamp(0.85rem, 2.2vw, 0.95rem); color: var(--text-secondary); margin-top: 5px; text-align: center;">Por haber completado satisfactoriamente todas las lecciones del curso:</p>
+                <h3 id="cert-course-name" style="font-size: clamp(1.1rem, 3.5vw, 1.4rem); color: var(--primary); margin-top: 10px; width: 100%; text-align: center;">Nombre del Curso</h3>
+                <p style="font-size: clamp(0.8rem, 2vw, 0.9rem); color: var(--text-secondary); margin-top: 15px; text-align: center;">Generación vinculada: <strong id="cert-student-gen"></strong></p>
+                <p style="font-size: clamp(0.8rem, 2vw, 0.9rem); color: var(--text-secondary); margin-top: 5px; font-weight: bold; text-align: center;" id="cert-date"></p>
+                <p id="cert-footer-quote" style="font-size: clamp(0.7rem, 1.5vw, 0.85rem); color: #BDC3C7; font-style: italic; margin-top: 25px; margin-bottom: 0; text-align: center;"></p>
+            </div>
+        </div>
+        <div class="dialog-actions" style="padding: 15px 20px; background: white; border-top: 1px solid #E0E0E0; margin-top: 0; justify-content: center; flex-wrap: wrap; gap: 10px; width: 100%; box-sizing: border-box;">
+            <button class="btn-secondary" onclick="window.exitActivity();"><i class="fi fi-ss-home"></i> Volver al Inicio</button>
+            <button onclick="window.downloadCertificateCanvas('png')" style="background-color: var(--primary-dark); width: auto;"><i class="fi fi-ss-picture"></i> Guardar PNG</button>
+        </div>
+    </div>
+</div>
+
+<div id="delete-modal" class="modal-overlay hidden">
+    <div class="modal-content danger-top">
+        <i class="fi fi-ss-trash modal-icon" style="color: var(--danger);"></i>
+        <h2 style="color: var(--danger); justify-content: center;">Eliminar Registro</h2>
+        <p>Estás a punto de eliminar <strong id="delete-exam-name-text"></strong> y TODAS sus respuestas. Esta acción no se puede deshacer.</p>
+        <p style="font-size: 0.9rem; color: var(--text-secondary); background: #FAFAFA; padding: 10px; border-radius: 8px;">Se descargará un respaldo en CSV automáticamente.</p>
+        <div class="form-group" style="width: 100%; margin-top: 15px;">
+            <label style="justify-content: center;">Escribe "eliminar" para confirmar:</label>
+            <input type="text" id="delete-confirm-input" style="text-align: center;" autocomplete="off" placeholder="eliminar">
+        </div>
+        <div class="dialog-actions">
+            <button class="btn-secondary" onclick="window.closeDeleteModal()"><i class="fi fi-ss-cross"></i> Cancelar</button>
+            <button id="btn-confirm-delete" class="btn-danger" onclick="window.executeDeleteExam()"><i class="fi fi-ss-trash"></i> Borrar</button>
+        </div>
+    </div>
+</div>
+
+<div id="reset-modal" class="modal-overlay hidden">
+    <div class="modal-content danger-top">
+        <i class="fi fi-ss-time-past modal-icon" style="color: var(--danger);"></i>
+        <h2 style="color: var(--danger); justify-content: center;">Restaurar de Fábrica</h2>
+        <p>Estás a punto de eliminar toda la configuración visual y de redes sociales. La plataforma volverá a su estado original y esta acción no se puede deshacer.</p>
+        <div class="form-group" style="width: 100%; margin-top: 15px;">
+            <label style="justify-content: center;">Escribe "resetear" para confirmar:</label>
+            <input type="text" id="reset-confirm-input" style="text-align: center;" autocomplete="off" placeholder="resetear">
+        </div>
+        <div class="dialog-actions">
+            <button class="btn-secondary" onclick="window.closeResetModal()"><i class="fi fi-ss-cross"></i> Cancelar</button>
+            <button id="btn-confirm-reset" class="btn-danger" onclick="window.executeResetSettings()"><i class="fi fi-ss-trash"></i> Restaurar</button>
+        </div>
+    </div>
+</div>
+
+<div id="warning-modal" class="modal-overlay hidden">
+    <div class="modal-content danger-top">
+        <i class="fi fi-ss-triangle-warning modal-icon" style="color: var(--warning);"></i>
+        <h2 style="color: var(--danger); justify-content: center;">ADVERTENCIA</h2>
+        <p id="warning-reason" style="text-align: center;">Se detectó pérdida de enfoque del examen.</p>
+        <p style="text-align: center; margin: 15px 0;">Infracción: <strong id="modal-count" style="color: var(--danger); font-size: 1.5rem;"></strong> de <strong id="modal-max-count">5</strong></p>
+        <button onclick="window.closeModal()" style="background-color: var(--danger); width: 100%;"><i class="fi fi-ss-check"></i> Entendido</button>
+    </div>
+</div>
+
+<div id="severe-modal" class="modal-overlay hidden">
+    <div class="modal-content danger-top" style="background-color: #FFEBEE; border: 4px solid var(--danger);">
+        <i class="fi fi-ss-shield-exclamation modal-icon" style="color: var(--danger);"></i>
+        <h2 style="color: var(--danger); font-size: 1.8rem; font-weight: 900; justify-content: center; text-align:center;">¡INFRACCIÓN GRAVE!</h2>
+        <p id="severe-reason" style="font-size: 1.2rem; font-weight: bold; color: var(--danger); text-align: center; margin: 15px 0;"></p>
+        <p style="color: var(--text-main); text-align: center;">La actividad ha sido cancelada automáticamente y reportada al sistema.</p>
+        <button onclick="window.exitActivity()" style="background-color: var(--danger); width: 100%; margin-top: 20px;"><i class="fi fi-ss-sign-out-alt"></i> Salir</button>
+    </div>
+</div>
+
+<div class="container">
+    <div id="blocked-view" class="card status-container hidden" style="border: 2px solid var(--danger); background-color: var(--danger-light);">
+        <i class="fi fi-ss-ban modal-icon" style="color: var(--danger);"></i>
+        <h1 id="blocked-title" style="color: var(--danger); margin-bottom: 10px;">ACTIVIDAD ANULADA</h1>
+        <p id="blocked-msg">Has superado el límite de infracciones o abandonaste la actividad.</p>
+        <button onclick="window.exitActivity()" style="margin-top: 20px; width: auto;"><i class="fi fi-ss-arrow-left"></i> Volver al Panel</button>
+    </div>
+
+    <div id="success-view" class="card status-container hidden" style="border: 2px solid var(--success); background-color: #E8F5E9;">
+        <i class="fi fi-ss-check-circle modal-icon" style="color: var(--success);"></i>
+        <h1 style="color: var(--success); margin-bottom: 10px;">¡ENVIADO CON ÉXITO!</h1>
+        <p>Tus respuestas han sido procesadas correctamente y guardadas en el sistema.</p>
+        <button onclick="window.exitActivity()" style="margin-top: 20px; width: auto;"><i class="fi fi-ss-arrow-left"></i> Volver al Panel</button>
+    </div>
+
+    <div id="loading-screen" class="card status-container hidden">
+        <i id="loading-spinner" class="fi fi-ss-spinner" style="font-size: 48px; color: var(--primary); display: inline-block; animation: spin 2s linear infinite;"></i>
+        <h2 id="loading-text" style="justify-content: center; margin-top: 20px; width: 100%;">Procesando...</h2>
+    </div>
+
+    <div id="role-selector" class="card hidden" style="text-align: center;">
+        <h2 style="justify-content: center;"><i class="fi fi-ss-users"></i> Bienvenido a la Plataforma</h2>
+        <p style="color: var(--text-secondary); margin-bottom: 30px;">Selecciona tu portal de acceso:</p>
+        <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
+            <button onclick="window.showStudentLogin()" style="width: 250px; padding: 20px;"><i class="fi fi-ss-graduation-cap"></i> Soy Alumno</button>
+            <button class="btn-secondary" onclick="window.showInstructorLogin()" style="width: 250px; padding: 20px;"><i class="fi fi-ss-chalkboard-user"></i> Soy Instructor</button>
+        </div>
+    </div>
+
+    <div id="login-view" class="card hidden" style="max-width: 400px; margin: 0 auto;">
+        <h2 style="justify-content: center;"><i class="fi fi-ss-chalkboard-user"></i> Instructores</h2>
+        <div class="form-group"><label><i class="fi fi-ss-envelope"></i> Correo Electrónico</label><input type="email" id="login-email"></div>
+        <div class="form-group"><label><i class="fi fi-ss-lock"></i> Contraseña</label><input type="password" id="login-pwd"></div>
+        <button id="login-btn" onclick="window.loginInstructor()"><i class="fi fi-ss-sign-in-alt"></i> Ingresar</button>
+    </div>
+
+    <div id="student-login-view" class="card hidden" style="max-width: 400px; margin: 0 auto;">
+        <h2 style="justify-content: center;"><i class="fi fi-ss-graduation-cap"></i> Acceso Alumnos</h2>
+        <p style="font-size: 0.9rem; color: var(--text-secondary); text-align: center;">Ingresa tus datos para acceder a tu aula virtual.</p>
+        <div class="form-group"><label><i class="fi fi-ss-user"></i> Nombre Completo</label><input type="text" id="std-login-name"></div>
+        <div class="form-group"><label><i class="fi fi-ss-envelope"></i> Correo Electrónico</label><input type="email" id="std-login-email"></div>
+        <div class="form-group">
+            <label><i class="fi fi-ss-key"></i> Código de Clase</label>
+            <input type="text" id="std-login-gen" placeholder="Proporcionado por tu instructor">
+        </div>
+        <button id="std-login-btn" onclick="window.loginStudent()"><i class="fi fi-ss-user-check"></i> Entrar a mi Aula</button>
+    </div>
+
+    <div id="student-portal" class="card hidden">
+        <div class="profile-box">
+            <i class="fi fi-ss-graduation-cap" style="font-size: 50px; color: var(--text-secondary);"></i>
+            <div>
+                <h3 style="margin: 0; font-size: 1.3rem;" id="portal-std-name">Alumno</h3>
+                <p style="margin: 0; color: var(--text-secondary); font-size: 0.9rem;"><i class="fi fi-ss-key"></i> Clase: <strong id="portal-std-gen" style="color: var(--primary-dark);"></strong></p>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h4><i class="fi fi-ss-check-circle"></i> Exámenes Aprobados</h4>
+                <span id="std-stats-passed">0</span>
+            </div>
+            <div class="stat-card">
+                <h4><i class="fi fi-ss-stats"></i> Promedio Global</h4>
+                <span id="std-stats-avg">0%</span>
+            </div>
+        </div>
+        
+        <h3 style="border-bottom: 2px solid #E0E0E0; padding-bottom: 5px;"><i class="fi fi-ss-clipboard-list-check"></i> Actividades Pendientes</h3>
+        <div id="pending-exams-list"></div>
+
+        <h3 style="margin-top: 30px; border-bottom: 2px solid #E0E0E0; padding-bottom: 5px;"><i class="fi fi-ss-folder-open"></i> Historial</h3>
+        <div class="table-responsive">
+            <table class="results-table">
+                <thead><tr><th>Actividad</th><th>Estatus</th><th>Acción</th></tr></thead>
+                <tbody id="history-exams-list"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="instructor-dashboard" class="card hidden">
+        <div class="instructor-profile-box">
+            <img id="dashboard-inst-avatar" src="" class="hidden">
+            <i id="dashboard-inst-icon" class="fi fi-ss-user-tie" style="font-size: 50px; color: var(--text-secondary);"></i>
+            <div>
+                <h3 style="margin: 0; font-size: 1.3rem;" id="dashboard-inst-name">Instructor Principal</h3>
+                <p style="margin: 0; color: var(--text-secondary); font-size: 0.9rem;"><i class="fi fi-ss-shield-check"></i> Administrador de Plataforma</p>
+            </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;">
+            <h2 style="margin: 0;"><i class="fi fi-ss-folder-tree"></i> Mis Actividades</h2>
+        </div>
+        <div style="display:flex; gap:10px; margin-bottom: 20px; flex-wrap: wrap;">
+            <button onclick="window.showUploadPanel('exam')" style="flex:1; min-width:150px;"><i class="fi fi-ss-add-document"></i> Examen</button>
+            <button onclick="window.showUploadPanel('course')" style="flex:1; min-width:150px; background-color: var(--primary-dark);"><i class="fi fi-ss-e-learning"></i> Curso</button>
+            <button onclick="window.showUploadPanel('survey')" class="btn-secondary" style="flex:1; min-width:150px;"><i class="fi fi-ss-comment-alt"></i> Encuesta</button>
+        </div>
+        
+        <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; background: #FAFAFA; padding: 15px; border-radius: 8px; border: 1px solid #E0E0E0;">
+            <div style="flex: 1; min-width: 150px;">
+                <label style="font-size: 0.85rem; font-weight: bold; color: var(--text-secondary); margin-bottom: 5px; display: block;">Filtrar por Tipo</label>
+                <select id="filter-act-type" onchange="window.filterActivities()" style="padding: 10px; margin:0;">
+                    <option value="all">Todas las actividades</option>
+                    <option value="exam">Evaluaciones</option>
+                    <option value="course">Cursos</option>
+                    <option value="survey">Encuestas</option>
+                </select>
+            </div>
+            <div style="flex: 2; min-width: 200px;">
+                <label style="font-size: 0.85rem; font-weight: bold; color: var(--text-secondary); margin-bottom: 5px; display: block;">Buscar por Generación o Nombre</label>
+                <input type="text" id="filter-act-search" placeholder="Ej. G30, GLOBAL, o palabra clave..." onkeyup="window.filterActivities()" style="padding: 10px; margin:0;">
+            </div>
+        </div>
+
+        <div id="exams-list-container"></div>
+    </div>
+
+    <div id="admin-settings" class="card hidden">
+        <h2 style="margin-bottom: 5px;"><i class="fi fi-ss-settings"></i> Configuración Global</h2>
+        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 25px; text-align: center;">Personaliza tu perfil y adapta la plataforma con la identidad de tu corporación.</p>
+        
+        <h3 style="border-bottom: 2px solid #E0E0E0; padding-bottom: 5px;"><i class="fi fi-ss-user-edit"></i> Mi Perfil</h3>
+        <div class="form-group">
+            <label>Nombre del Instructor / Grado</label>
+            <input type="text" id="config-inst-name" placeholder="Ej. Paramédico Juan Pérez">
+        </div>
+        <div class="form-group" style="background: #FAFAFA; padding: 15px; border-radius: 8px;">
+            <label><i class="fi fi-ss-camera"></i> Foto de Perfil</label>
+            <input type="file" id="config-inst-avatar" accept="image/png, image/jpeg" style="padding: 0; border: none; background: transparent;">
+        </div>
+
+        <h3 style="border-bottom: 2px solid #E0E0E0; padding-bottom: 5px; margin-top: 30px;"><i class="fi fi-ss-paint-roller"></i> Diseño de la Plataforma</h3>
+        <div class="form-group">
+            <label><i class="fi fi-ss-text"></i> Nombre de la Institución / Corporación</label>
+            <input type="text" id="config-brand-name" placeholder="Ej. Cruz Roja Delegación Texcoco">
+        </div>
+
+        <div class="form-group">
+            <label><i class="fi fi-ss-fill"></i> Color Institucional Principal</label>
+            <div class="color-picker-wrapper">
+                <input type="color" id="config-brand-color" value="#0288D1">
+                <input type="text" id="config-brand-hex" value="#0288D1" maxlength="7">
+            </div>
+            <small style="color: var(--text-secondary); display:block; margin-top:5px;">Afecta a botones, títulos y elementos principales.</small>
+        </div>
+
+        <div class="form-group">
+            <label><i class="fi fi-ss-fill"></i> Color Secundario (Fondo del Footer)</label>
+            <div class="color-picker-wrapper">
+                <input type="color" id="config-footer-color" value="#2C3E50">
+                <input type="text" id="config-footer-hex" value="#2C3E50" maxlength="7">
+            </div>
+            <small style="color: var(--text-secondary); display:block; margin-top:5px;">Color de fondo para el pie de página de toda la plataforma.</small>
+        </div>
+
+        <div class="form-group">
+            <label><i class="fi fi-ss-quote-right"></i> Frase Institucional del Footer</label>
+            <textarea id="config-footer-quote" rows="2" placeholder='Ej. "If you want different results, do not do the same things." - Albert Einstein'></textarea>
+            <small style="color: var(--text-secondary); display:block; margin-top:5px;">Esta frase se mostrará en el pie de página y en los certificados emitidos.</small>
+        </div>
+
+        <div class="form-group" style="background: #FAFAFA; padding: 15px; border-radius: 8px;">
+            <label><i class="fi fi-ss-picture"></i> Logotipo Institucional</label>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0;">Se mostrará en la barra superior, en la pestaña del navegador y en el Certificado. (PNG o JPG).</p>
+            <input type="file" id="config-brand-logo" accept="image/png, image/jpeg" style="padding: 0; border: none; background: transparent;">
+        </div>
+
+        <h3 style="border-bottom: 2px solid #E0E0E0; padding-bottom: 5px; margin-top: 30px;"><i class="fi fi-ss-share"></i> Redes Sociales</h3>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: -10px; margin-bottom: 15px;">Deja en blanco las que no desees mostrar en el pie de página.</p>
+        
+        <div class="form-group">
+            <label><i class="fi fi-brands-facebook" style="color: #1877F2;"></i> URL de Facebook</label>
+            <input type="text" id="config-social-fb" placeholder="Ej. https://facebook.com/tupagina">
+        </div>
+        <div class="form-group">
+            <label><i class="fi fi-brands-instagram" style="color: #E4405F;"></i> URL de Instagram</label>
+            <input type="text" id="config-social-ig" placeholder="Ej. https://instagram.com/tuperfil">
+        </div>
+        <div class="form-group">
+            <label><i class="fi fi-brands-whatsapp" style="color: #25D366;"></i> Enlace de WhatsApp</label>
+            <input type="text" id="config-social-wa" placeholder="Ej. https://wa.me/5211234567890">
+        </div>
+        <div class="form-group">
+            <label><i class="fi fi-ss-globe" style="color: var(--primary);"></i> Sitio Web</label>
+            <input type="text" id="config-social-web" placeholder="Ej. https://tusitio.com">
+        </div>
+        
+        <div style="display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap;">
+            <button id="btn-save-settings" onclick="window.savePlatformSettings()" style="flex: 1;"><i class="fi fi-ss-disk"></i> Guardar Cambios</button>
+            <button class="btn-danger" onclick="window.promptResetSettings()" style="flex: 1; background-color: var(--danger);"><i class="fi fi-ss-time-past"></i> Restaurar de Fábrica</button>
+        </div>
+    </div>
+
+    <div id="instructor-upload" class="card hidden">
+        <h2 id="upload-panel-title"><i class="fi fi-ss-file-edit"></i> Configurar</h2>
+        
+        <div id="exam-specific-fields">
+            <div class="form-group">
+                <label><i class="fi fi-ss-shield-check"></i> Nivel de Seguridad</label>
+                <select id="exam-security">
+                    <option value="easy">Fácil (Bloqueo básico, 5 infracciones)</option>
+                    <option value="medium">Medio (Anti-inactividad 15s, 3 infracciones)</option>
+                    <option value="advanced" disabled>Avanzado (Próximamente - Monitoreo por Cámara)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group"><label><i class="fi fi-ss-text"></i> Nombre de la Actividad</label><input type="text" id="exam-name" placeholder="Ej. Examen Módulo 1 / Curso de Inducción"></div>
+        
+        <div class="form-group" id="container-exam-gen">
+            <label id="label-exam-gen"><i class="fi fi-ss-key"></i> Código de Clase (Generación)</label>
+            <input type="text" id="exam-gen" placeholder="Ej. G30-TEXCOCO">
+            <small id="hint-exam-gen" style="color: var(--text-secondary); display:block; margin-top:5px;">Los alumnos necesitarán este código para ver la actividad.</small>
+        </div>
+        
+        <div class="grid-layout" id="exam-numeric-fields">
+            <div class="form-group">
+                <label><i class="fi fi-ss-shuffle"></i> Preguntas Mostrar</label>
+                <input type="number" id="exam-q-to-show" placeholder="Todas" min="1">
+            </div>
+            <div class="form-group"><label><i class="fi fi-ss-bullseye"></i> Aprobar Mínimo (%)</label><input type="number" id="exam-min-score" value="80"></div>
+            <div class="form-group"><label><i class="fi fi-ss-time-quarter-to"></i> Tiempo (Min)</label><input type="number" id="exam-duration" value="60"></div>
+        </div>
+        
+        <div class="form-group" style="background: #FFF3E0; padding: 15px; border-left: 4px solid var(--warning); border-radius: 8px;" id="container-expiration">
+            <label style="color: #E65100;"><i class="fi fi-ss-calendar-clock"></i> Fecha y Hora de Cierre (Expiración)</label>
+            <input type="datetime-local" id="exam-expiration">
+        </div>
+
+        <input type="file" id="json-file" accept=".json" class="hidden">
+        <label for="json-file" class="btn-upload" id="upload-trigger"><i class="fi fi-ss-upload"></i> Cargar Archivo JSON</label>
+    </div>
+
+    <div id="instructor-grades" class="card hidden">
+        <h2 id="grades-exam-title"><i class="fi fi-ss-stats"></i> Resultados</h2>
+        
+        <div id="share-container" style="background: #FAFAFA; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #E0E0E0;">
+            <p style="margin: 0 0 10px 0;"><strong><i class="fi fi-ss-link-alt"></i> Link directo:</strong></p>
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <a href="#" id="exam-share-link" onclick="window.handleInstructorLinkClick(event)" style="color: var(--primary); font-weight: bold; word-break: break-all;"></a>
+                <button onclick="window.copyLink('exam-share-link')" class="btn-secondary btn-sm" style="width: auto;"><i class="fi fi-ss-copy"></i> Copiar</button>
+            </div>
+        </div>
+        
+        <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+            <button onclick="window.loadGrades(window.currentExamId)" class="btn-sm" style="width: auto;"><i class="fi fi-ss-refresh"></i> Actualizar</button>
+            <button class="btn-success btn-sm" onclick="window.gradeAllPendings()" style="width: auto;"><i class="fi fi-ss-check-clipboard"></i> Calificar Pendientes</button>
+            <button class="btn-primary btn-sm" onclick="window.exportToCSV()" style="width: auto; background-color: var(--text-secondary);"><i class="fi fi-ss-file-excel"></i> Exportar CSV</button>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="results-table" id="grades-table">
+                <thead>
+                    <tr>
+                        <th style="width: 40px; text-align: center;">#</th>
+                        <th class="sortable" onclick="window.sortGrades('name')">Alumno <i class="fi fi-ss-sort-alpha-down"></i></th>
+                        <th>Tiempo / Inf.</th>
+                        <th>Aciertos</th>
+                        <th class="sortable" onclick="window.sortGrades('score')">Calificación <i class="fi fi-ss-sort-numeric-down"></i></th>
+                        <th class="sortable" onclick="window.sortGrades('status')">Estatus <i class="fi fi-ss-sort"></i></th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="grades-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="instructor-survey-analytics" class="card hidden">
+        <h2 id="analytics-title"><i class="fi fi-ss-comment-alt" style="color:var(--primary);"></i> Analíticas de Encuesta</h2>
+        
+        <div style="background: #FAFAFA; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #E0E0E0;">
+            <p style="margin: 0 0 10px 0;"><strong><i class="fi fi-ss-link-alt"></i> Link directo:</strong></p>
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <a href="#" id="survey-share-link" onclick="window.handleInstructorLinkClick(event)" style="color: var(--primary); font-weight: bold; word-break: break-all;"></a>
+                <button onclick="window.copyLink('survey-share-link')" class="btn-secondary btn-sm" style="width: auto;"><i class="fi fi-ss-copy"></i> Copiar</button>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+            <button onclick="window.viewSurveyAnalytics(window.currentExamId)" class="btn-sm" style="width: auto;"><i class="fi fi-ss-refresh"></i> Actualizar</button>
+        </div>
+
+        <div id="analytics-container"></div>
+    </div>
+
+    <div id="exam-view" class="card hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h1 id="display-exam-name" style="margin: 0;"><i class="fi fi-ss-file-signature"></i> Evaluación</h1>
+            <button id="btn-exit-activity" class="btn-secondary btn-sm hidden" onclick="window.exitActivity()" style="width: auto; margin: 0;"><i class="fi fi-ss-sign-out-alt"></i> Salir</button>
+        </div>
+        <h3 id="display-exam-gen" style="color: var(--text-secondary); margin-top: 0;"></h3>
+        <p id="display-exam-exp" style="color: var(--danger); font-weight: bold; font-size: 0.9rem; text-align: center; margin-top:-10px;"></p>
+        
+        <div id="exam-intro">
+            <div class="form-group" id="manual-student-data" style="background: #FAFAFA; padding: 20px; border-radius: 8px; border: 1px solid #E0E0E0;">
+                <div style="margin-bottom: 15px;">
+                    <label><i class="fi fi-ss-user"></i> Nombre Completo</label>
+                    <input type="text" id="manual-name">
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label><i class="fi fi-ss-envelope"></i> Correo Electrónico</label>
+                    <input type="email" id="manual-email">
+                </div>
+                <div id="wrapper-manual-gen">
+                    <label><i class="fi fi-ss-key"></i> Código de Clase</label>
+                    <input type="text" id="manual-gen" placeholder="Ingresa el código proporcionado">
+                </div>
+            </div>
+            
+            <ul id="exam-rules-list" style="padding: 15px 15px 15px 35px; border-radius: 8px;">
+            </ul>
+            <button id="start-btn" onclick="window.startExamProcess()"><i class="fi fi-ss-play"></i> Comenzar</button>
+        </div>
+
+        <div id="exam-wrapper" class="hidden">
+            <div class="sticky-header">
+                <div style="display: flex; align-items: center; gap: 8px;" id="running-title"><i class="fi fi-ss-pencil"></i> En curso</div>
+                <div class="timer-display" id="timer-text"><i class="fi fi-ss-time-quarter-to"></i> 00:00:00</div>
+            </div>
+            <div id="exam-container"></div>
+            <button id="submit-btn" onclick="window.submitExam(false)" style="background-color: var(--success); margin-top: 25px;"><i class="fi fi-ss-paper-plane"></i> Finalizar y Enviar</button>
+        </div>
+    </div>
+
+    <div id="course-view" class="card hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h1 id="display-course-name" style="margin: 0;"><i class="fi fi-ss-e-learning"></i> Curso</h1>
+            <button class="btn-secondary btn-sm" onclick="window.exitActivity()" style="width: auto; margin: 0;"><i class="fi fi-ss-sign-out-alt"></i> Salir del Curso</button>
+        </div>
+        
+        <div class="survey-bar-bg" style="margin-bottom: 20px;"><div id="course-progress-bar" class="survey-bar-fill" style="width:0%;"></div></div>
+        
+        <h3 id="course-module-title" style="color: var(--primary-dark); font-size: 1.5rem; margin-bottom: 15px;"></h3>
+        
+        <div id="course-video-container" class="yt-container hidden"></div>
+        <div id="course-attachments-container" class="hidden" style="margin-top: 20px; margin-bottom: 20px;"></div>
+        
+        <div style="display: flex; justify-content: space-between; margin-top: 30px; border-top: 1px solid #E0E0E0; padding-top: 20px;">
+            <button id="btn-course-prev" class="btn-secondary" onclick="window.prevCourseModule()" style="width: auto;"><i class="fi fi-ss-arrow-left"></i> Anterior</button>
+            <button id="btn-course-next" onclick="window.nextCourseModule()" style="width: auto; margin-left: auto;">Siguiente <i class="fi fi-ss-arrow-right"></i></button>
+        </div>
+    </div>
+
+</div>
+
+<footer class="app-footer" id="main-app-footer">
+    <div id="footer-social-links" style="display:flex; justify-content:center; gap:15px; margin-bottom:10px; font-size:1.5rem;" class="hidden"></div>
+    <p>Desarrollado por Enkodo by EAM - Release Candidate</p>
+    <p class="quote" id="app-footer-quote">"If you want different results, do not do the same things." - Albert Einstein</p>
+</footer>
+
+<!-- JS EXTERNO -->
+<script type="module" src="./js/app.js"></script>
+
+</body>
+</html>
