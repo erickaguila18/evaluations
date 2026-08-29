@@ -83,4 +83,5 @@ Cada bloque representa un módulo secuencial. Incluye el título, el enlace de Y
     "attachments": []
   }
 ]
+
 ```
